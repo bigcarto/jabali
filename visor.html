@@ -1,0 +1,1044 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Telemetría Jabalí · Asturias</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
+<style>
+:root {
+  --bg:       #0d1117;
+  --surface:  #161b22;
+  --border:   #21262d;
+  --accent:   #58a6ff;
+  --warn:     #f0883e;
+  --danger:   #ff7b72;
+  --ok:       #3fb950;
+  --muted:    #8b949e;
+  --text:     #e6edf3;
+  --mono:     'IBM Plex Mono', monospace;
+  --sans:     'Syne', sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--mono);
+  height: 100vh;
+  display: grid;
+  grid-template-rows: 52px 1fr;
+  overflow: hidden;
+}
+
+/* HEADER */
+header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+header h1 {
+  font-family: var(--sans);
+  font-weight: 800;
+  font-size: 15px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+header .subtitle {
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+}
+.header-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+#load-btn {
+  background: var(--accent);
+  color: var(--bg);
+  border: none;
+  padding: 6px 14px;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  transition: opacity .15s;
+}
+#load-btn:hover { opacity: 0.85; }
+
+/* MAIN LAYOUT */
+main {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  overflow: hidden;
+}
+
+/* SIDEBAR */
+aside {
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.panel {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.panel-label {
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+select {
+  width: 100%;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 8px 10px;
+  font-family: var(--mono);
+  font-size: 12px;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238b949e' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  margin-bottom: 6px;
+}
+select:last-child { margin-bottom: 0; }
+select:focus { outline: 1px solid var(--accent); }
+
+/* DATE RANGE */
+.date-range-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.date-field label {
+  font-size: 9px;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  display: block;
+  margin-bottom: 3px;
+}
+input[type="date"] {
+  width: 100%;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 6px 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+  cursor: pointer;
+  color-scheme: dark;
+}
+input[type="date"]:focus { outline: 1px solid var(--accent); }
+
+.btn-apply {
+  width: 100%;
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  padding: 6px 10px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  letter-spacing: 0.06em;
+  transition: background .15s, color .15s;
+  margin-top: 2px;
+}
+.btn-apply:hover { background: var(--accent); color: var(--bg); }
+
+/* MODE TABS */
+.mode-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  border: 1px solid var(--border);
+  margin-bottom: 6px;
+}
+.mode-tab {
+  background: transparent;
+  color: var(--muted);
+  border: none;
+  padding: 7px 4px;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  transition: background .1s, color .1s;
+  text-align: center;
+}
+.mode-tab:first-child { border-right: 1px solid var(--border); }
+.mode-tab.active { background: var(--accent); color: var(--bg); }
+.mode-tab:not(.active):hover { background: var(--border); color: var(--text); }
+
+/* JORNADAS LIST */
+.jornadas-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+.jornadas-list::-webkit-scrollbar { width: 4px; }
+.jornadas-list::-webkit-scrollbar-thumb { background: var(--border); }
+
+.jornada-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: background .1s;
+  border-left: 3px solid transparent;
+}
+.jornada-item:hover { background: var(--border); }
+.jornada-item.active {
+  background: rgba(88,166,255,.08);
+  border-left-color: var(--accent);
+}
+.jornada-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.jornada-date {
+  font-size: 12px;
+  flex: 1;
+}
+.jornada-badges {
+  display: flex;
+  gap: 4px;
+}
+.jornada-metrics {
+  display: flex;
+  gap: 12px;
+  font-size: 10px;
+  color: var(--muted);
+  padding-left: 2px;
+}
+.jornada-metrics span { letter-spacing: 0.02em; }
+.jornada-metrics b { color: var(--text); font-weight: 600; }
+.badge {
+  font-size: 9px;
+  padding: 2px 5px;
+  border-radius: 2px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+.badge-gap      { background: rgba(240,136,62,.2);   color: var(--warn); }
+.badge-vel      { background: rgba(255,123,114,.2);  color: var(--danger); }
+.badge-pos      { background: rgba(139,148,158,.15); color: var(--muted); }
+.badge-ok       { background: rgba(63,185,80,.15);   color: var(--ok); }
+
+/* INDIVIDUO INFO BAR (modo todos) */
+.individuo-info {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(88,166,255,0.05);
+  display: none;
+}
+.individuo-info.visible { display: block; }
+.individuo-name {
+  font-family: var(--sans);
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+.individuo-range {
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+
+/* STATS STRIP */
+.stats-strip {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.stat { text-align: center; }
+.stat-val { font-size: 16px; font-family: var(--sans); font-weight: 700; color: var(--accent); }
+.stat-lbl { font-size: 9px; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; margin-top: 2px; }
+
+/* MAP */
+#map {
+  width: 100%;
+  height: 100%;
+  background: #0a0f14;
+}
+
+/* LEYENDA MAPA */
+.map-legend {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 10px 14px;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.8;
+  pointer-events: none;
+}
+.legend-dot {
+  display: inline-block;
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+/* EMPTY STATE */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.empty-icon { font-size: 32px; opacity: .4; }
+
+/* LEAFLET LAYER CONTROL – dark theme */
+.leaflet-control-layers {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  font-family: var(--mono) !important;
+  font-size: 11px !important;
+  color: var(--text) !important;
+}
+.leaflet-control-layers-expanded { padding: 8px 12px !important; }
+.leaflet-control-layers label { color: var(--text) !important; display: flex; align-items: center; gap: 6px; margin: 4px 0; }
+.leaflet-control-layers-separator { border-color: var(--border) !important; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Telemetría Jabalí · Asturias</h1>
+    <div class="subtitle">Análisis espacial por jornada biológica</div>
+  </div>
+  <div class="header-right">
+    <input type="file" id="file-input" accept=".json" style="display:none">
+    <button id="load-btn" onclick="document.getElementById('file-input').click()">
+      ▲ Cargar JSON
+    </button>
+  </div>
+</header>
+
+<main>
+  <aside>
+    <!-- Selectores zona + individuo -->
+    <div class="panel">
+      <div class="panel-label">Zona</div>
+      <select id="sel-zona" disabled>
+        <option value="">— cargar datos —</option>
+      </select>
+      <div class="panel-label" style="margin-top:10px">Individuo</div>
+      <select id="sel-individuo" disabled>
+        <option value="">— seleccionar zona —</option>
+      </select>
+    </div>
+
+    <!-- Modo de visualización -->
+    <div class="panel">
+      <div class="panel-label">Modo de visualización</div>
+      <div class="mode-tabs">
+        <button class="mode-tab active" id="tab-todos" onclick="setMode('todos')">Todos los datos</button>
+        <button class="mode-tab" id="tab-jornada" onclick="setMode('jornada')">Por jornada</button>
+      </div>
+
+      <!-- Filtro por fechas (visible en ambos modos) -->
+      <div id="panel-fechas">
+        <div class="date-range-row">
+          <div class="date-field">
+            <label>Desde</label>
+            <input type="date" id="fecha-desde">
+          </div>
+          <div class="date-field">
+            <label>Hasta</label>
+            <input type="date" id="fecha-hasta">
+          </div>
+        </div>
+        <button class="btn-apply" onclick="applyFechas()">↩ Aplicar rango</button>
+      </div>
+    </div>
+
+    <!-- Filtro jornadas (solo visible en modo jornada) -->
+    <div class="panel" id="panel-filtro-jornadas" style="padding-bottom:8px; display:none;">
+      <div class="panel-label">Jornadas biológicas</div>
+      <select id="filtro-errores">
+        <option value="todas">Mostrar todas</option>
+        <option value="errores">Solo con errores</option>
+        <option value="ok">Solo sin errores</option>
+      </select>
+    </div>
+
+    <!-- Info individuo (modo todos) -->
+    <div class="individuo-info" id="individuo-info">
+      <div class="individuo-name" id="individuo-name-label">—</div>
+      <div class="individuo-range" id="individuo-range-label">—</div>
+    </div>
+
+    <!-- Lista de jornadas (solo modo jornada) -->
+    <div class="jornadas-list" id="jornadas-list" style="display:none">
+      <div class="empty">
+        <div class="empty-icon">👆</div>
+        <span>Selecciona un individuo</span>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-strip" id="stats-strip" style="display:none">
+      <div class="stat"><div class="stat-val" id="s-registros">—</div><div class="stat-lbl">Posiciones</div></div>
+      <div class="stat"><div class="stat-val" id="s-distancia">—</div><div class="stat-lbl">Distancia</div></div>
+      <div class="stat"><div class="stat-val" id="s-gaps">—</div><div class="stat-lbl">Gaps</div></div>
+      <div class="stat"><div class="stat-val" id="s-vel">—</div><div class="stat-lbl">Veh.</div></div>
+    </div>
+  </aside>
+
+  <div id="map"></div>
+</main>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/esri-leaflet@3.0.12/dist/esri-leaflet.js"></script>
+<script>
+(function () {
+
+// ─── Estado ───────────────────────────────────────────────────
+let allData        = [];
+let currentZona    = null;
+let currentIndividuo = null; // null o cadena vacía significa "todos los de la zona"
+let currentJornada   = null;
+let currentMode      = 'todos';   // 'todos' | 'jornada'
+let markers          = [];
+let pathLayers       = []; // Para manejar múltiples polilíneas
+let activeFechaDesde = null;
+let activeFechaHasta = null;
+
+// ─── Capas base ───────────────────────────────────────────────
+const layerBlank = L.tileLayer('', { attribution: '' });
+
+const layerIGN = L.tileLayer.wms('https://www.ign.es/wms-inspire/ign-base', {
+  layers: 'IGNBaseTodo',
+  format: 'image/png',
+  transparent: false,
+  version: '1.3.0',
+  attribution: '© <a href="https://www.ign.es">IGN España</a>',
+  maxZoom: 20,
+});
+
+const layerIGNOrto = L.tileLayer.wms('https://www.ign.es/wms-inspire/pnoa-ma', {
+  layers: 'OI.OrthoimageCoverage',
+  format: 'image/png',
+  transparent: false,
+  version: '1.3.0',
+  attribution: '© PNOA – <a href="https://www.ign.es">IGN España</a>',
+  maxZoom: 20,
+  opacity: 0.55,
+});
+
+const layerTerrenos = L.esri.featureLayer({
+  url: 'https://services5.arcgis.com/u5zHBvUWTouFk0dG/arcgis/rest/services/terrenos_22/FeatureServer/0',
+  style: function () {
+    return {
+      color:       '#f0883e',
+      weight:      1.5,
+      opacity:     0.9,
+      fillColor:   '#f0883e',
+      fillOpacity: 0.12,
+    };
+  },
+  onEachFeature: function (feature, layer) {
+    if (feature.properties) {
+      const props = feature.properties;
+      const rows = Object.entries(props)
+        .filter(([k, v]) => v !== null && v !== '')
+        .map(([k, v]) => `<tr><td style="color:#8b949e;padding-right:10px">${k}</td><td><b>${v}</b></td></tr>`)
+        .join('');
+      layer.bindPopup(
+        `<div style="font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:1.7;min-width:200px;max-width:280px">
+          <b style="font-size:12px;color:#f0883e">Terreno</b><br>
+          <hr style="border-color:#21262d;margin:4px 0">
+          <table style="border-collapse:collapse;width:100%">${rows}</table>
+        </div>`,
+        { maxWidth: 300 }
+      );
+    }
+  },
+});
+
+const map = L.map('map', {
+  zoomControl: true,
+  layers: [layerBlank],
+}).setView([43.35, -5.85], 9);
+
+L.control.layers(
+  {
+    'Sin fondo':    layerBlank,
+    'IGN Base':     layerIGN,
+    'IGN Ortofoto': layerIGNOrto,
+  },
+  {
+    'Terrenos (ArcGIS)': layerTerrenos,
+  },
+  { position: 'topright', collapsed: false }
+).addTo(map);
+
+const legend = L.control({ position: 'bottomright' });
+legend.onAdd = () => {
+  const d = L.DomUtil.create('div', 'map-legend');
+  d.innerHTML = `
+    <b style="font-size:10px;letter-spacing:.08em">PERIODO</b><br>
+    <span class="legend-dot" style="background:#f0883e"></span>crepuscular<br>
+    <span class="legend-dot" style="background:#58a6ff"></span>diurno<br>
+    <span class="legend-dot" style="background:#8b949e"></span>nocturno<br>
+    <br><b style="font-size:10px;letter-spacing:.08em">FLAGS</b><br>
+    <svg width="12" height="12" viewBox="0 0 16 16" style="margin-right:6px;vertical-align:middle"><polygon points="8,1 15,15 1,15" fill="#ff7b72" stroke="#fff" stroke-width="1.5"/></svg>vehículo<br>
+    <svg width="12" height="12" viewBox="0 0 16 16" style="margin-right:6px;vertical-align:middle"><rect x="1" y="1" width="14" height="14" fill="#e3b341" stroke="#fff" stroke-width="1.5"/></svg>gap<br>
+    <svg width="12" height="12" viewBox="0 0 16 16" style="margin-right:6px;vertical-align:middle"><line x1="2" y1="2" x2="14" y2="14" stroke="#d2a8ff" stroke-width="2.5" stroke-linecap="round"/><line x1="14" y1="2" x2="2" y2="14" stroke="#d2a8ff" stroke-width="2.5" stroke-linecap="round"/></svg>poswrong<br>
+    <br><b style="font-size:10px;letter-spacing:.08em">VIRTUALES</b><br>
+    <svg width="12" height="12" viewBox="0 0 16 16" style="margin-right:6px;vertical-align:middle"><polygon points="8,14 1,2 15,2" fill="none" stroke="#a5d6ff" stroke-width="1.8" stroke-dasharray="3,2"/></svg>cierre (12:00)<br>
+    <svg width="12" height="12" viewBox="0 0 16 16" style="margin-right:6px;vertical-align:middle"><polygon points="8,14 1,2 15,2" fill="#a5d6ff" stroke="#a5d6ff" stroke-width="1"/></svg>apertura (12:01)
+  `;
+  return d;
+};
+legend.addTo(map);
+
+const PERIODO_COLOR = {
+  'diurno':                  '#58a6ff',
+  'nocturno':                '#8b949e',
+  'crepuscular_matutino':    '#f0883e',
+  'crepuscular_vespertino':  '#f0883e',
+  'desconocido':             '#444',
+};
+
+function getColor(row) {
+  if (row.flag_vehiculo)      return '#ff7b72';
+  if (row.flag_gap)           return '#e3b341';
+  if (row.poswrong === 'yes') return '#d2a8ff';
+  return PERIODO_COLOR[row.periodo] || '#58a6ff';
+}
+function getRadius(row) {
+  return (row.flag_vehiculo || row.flag_gap) ? 7 : 5;
+}
+
+function getZona(id) {
+  const idx = id.indexOf('-');
+  return idx >= 0 ? id.slice(idx + 1) : id;
+}
+
+// ─── Carga de archivo ─────────────────────────────────────────
+document.getElementById('file-input').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const texto = ev.target.result
+        .replace(/:\s*Infinity/g,  ': null')
+        .replace(/:\s*-Infinity/g, ': null')
+        .replace(/:\s*NaN/g,       ': null');
+      allData = JSON.parse(texto);
+      initUI();
+    } catch(err) {
+      alert('Error al leer el JSON: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+});
+
+function initUI() {
+  const zonas = [...new Set(allData.map(r => getZona(r.id_individuo)))].sort();
+  const selZ = document.getElementById('sel-zona');
+  selZ.innerHTML = '<option value="">— todas las zonas —</option>';
+  zonas.forEach(z => {
+    const opt = document.createElement('option');
+    opt.value = opt.textContent = z;
+    selZ.appendChild(opt);
+  });
+  selZ.disabled = false;
+
+  populateIndividuos(null);
+  document.getElementById('load-btn').textContent = '✓ ' + allData.length.toLocaleString() + ' reg.';
+}
+
+function populateIndividuos(zona) {
+  const individuos = [...new Set(allData.map(r => r.id_individuo))]
+    .filter(id => !zona || getZona(id) === zona)
+    .sort();
+  const sel = document.getElementById('sel-individuo');
+  
+  sel.innerHTML = zona 
+    ? '<option value="">— todos los individuos —</option>' 
+    : '<option value="">— seleccionar zona —</option>';
+    
+  individuos.forEach(ind => {
+    const opt = document.createElement('option');
+    opt.value = opt.textContent = ind;
+    sel.appendChild(opt);
+  });
+  sel.disabled = !zona;
+}
+
+// ─── Cambio de modo ───────────────────────────────────────────
+window.setMode = function(mode) {
+  currentMode    = mode;
+  currentJornada = null;
+
+  document.getElementById('tab-todos').classList.toggle('active', mode === 'todos');
+  document.getElementById('tab-jornada').classList.toggle('active', mode === 'jornada');
+  document.getElementById('panel-filtro-jornadas').style.display = mode === 'jornada' ? 'block' : 'none';
+  document.getElementById('jornadas-list').style.display         = mode === 'jornada' ? 'flex' : 'none';
+  document.getElementById('individuo-info').classList.toggle('visible', mode === 'todos');
+
+  if (mode === 'todos') {
+    renderTodos();
+  } else {
+    renderJornadasList();
+    clearMap();
+  }
+};
+
+// ─── Selector zona ───────────────────────────────────────────
+document.getElementById('sel-zona').addEventListener('change', e => {
+  currentZona = e.target.value || null;
+  currentIndividuo = null;
+  currentJornada   = null;
+  activeFechaDesde = null;
+  activeFechaHasta = null;
+  document.getElementById('fecha-desde').value = '';
+  document.getElementById('fecha-hasta').value = '';
+  
+  populateIndividuos(currentZona);
+  
+  if (currentMode === 'todos') {
+    renderTodos();
+  } else {
+    renderJornadasList();
+    clearMap();
+  }
+});
+
+// ─── Selector individuo ───────────────────────────────────────
+document.getElementById('sel-individuo').addEventListener('change', e => {
+  currentIndividuo = e.target.value || null;
+  currentJornada   = null;
+  activeFechaDesde = null;
+  activeFechaHasta = null;
+  document.getElementById('fecha-desde').value = '';
+  document.getElementById('fecha-hasta').value = '';
+
+  if (currentIndividuo) {
+    const datos = allData.filter(r => r.id_individuo === currentIndividuo && r.virtual === 'no');
+    const fechas = datos.map(r => r.jorbio).sort();
+    if (fechas.length) {
+      document.getElementById('fecha-desde').value = fechas[0];
+      document.getElementById('fecha-hasta').value = fechas[fechas.length - 1];
+    }
+  }
+
+  if (currentMode === 'todos') {
+    renderTodos();
+  } else {
+    renderJornadasList();
+    clearMap();
+  }
+});
+
+document.getElementById('filtro-errores').addEventListener('change', () => {
+  renderJornadasList();
+});
+
+// ─── Aplicar rango de fechas ──────────────────────────────────
+window.applyFechas = function() {
+  activeFechaDesde = document.getElementById('fecha-desde').value || null;
+  activeFechaHasta = document.getElementById('fecha-hasta').value || null;
+
+  if (currentMode === 'todos') {
+    renderTodos();
+  } else {
+    currentJornada = null;
+    renderJornadasList();
+    clearMap();
+  }
+};
+
+// ─── Obtener datos filtrados ─────
+function getDatosFiltrados() {
+  // Si no hay zona ni individuo, nada que mostrar
+  if (!currentZona && !currentIndividuo) return [];
+  
+  return allData.filter(r => {
+    // Si hay individuo seleccionado, filtrar por él
+    if (currentIndividuo) {
+      if (r.id_individuo !== currentIndividuo) return false;
+    } 
+    // Si no hay individuo pero sí zona, filtrar por zona
+    else if (currentZona) {
+      if (getZona(r.id_individuo) !== currentZona) return false;
+    }
+    
+    if (activeFechaDesde && r.jorbio < activeFechaDesde) return false;
+    if (activeFechaHasta && r.jorbio > activeFechaHasta) return false;
+    return true;
+  });
+}
+
+// ─── MODO TODOS: mostrar visualización global en mapa ───────────
+function renderTodos() {
+  clearMap();
+
+  const infoBar   = document.getElementById('individuo-info');
+  const nameLabel = document.getElementById('individuo-name-label');
+  const rangeLabel= document.getElementById('individuo-range-label');
+
+  if (!currentZona && !currentIndividuo) {
+    infoBar.classList.remove('visible');
+    document.getElementById('stats-strip').style.display = 'none';
+    return;
+  }
+
+  const registros = getDatosFiltrados()
+    .sort((a, b) => a.time_stamp.localeCompare(b.time_stamp));
+
+  const reales = registros.filter(r => !r.virtual || r.virtual === 'no');
+
+  if (reales.length === 0) {
+    infoBar.classList.add('visible');
+    nameLabel.textContent  = currentIndividuo || `Zona: ${currentZona}`;
+    rangeLabel.textContent = 'Sin datos en el rango seleccionado';
+    document.getElementById('stats-strip').style.display = 'none';
+    return;
+  }
+
+  // Info bar
+  const fechas = reales.map(r => r.jorbio).sort();
+  const nIndiv = [...new Set(reales.map(r => r.id_individuo))].length;
+  
+  const titleStr = currentIndividuo || `${currentZona} (${nIndiv} ind.)`;
+  const rangeStr = activeFechaDesde || activeFechaHasta
+    ? `${activeFechaDesde || fechas[0]} → ${activeFechaHasta || fechas[fechas.length-1]} · ${reales.length.toLocaleString()} pos.`
+    : `${fechas[0]} → ${fechas[fechas.length-1]} · ${reales.length.toLocaleString()} pos.`;
+  
+  nameLabel.textContent  = titleStr;
+  rangeLabel.textContent = rangeStr;
+  infoBar.classList.add('visible');
+
+  // Agrupar por individuo para dibujar polilíneas separadas
+  const grouped = {};
+  registros.forEach(r => {
+    if (!grouped[r.id_individuo]) grouped[r.id_individuo] = [];
+    grouped[r.id_individuo].push(r);
+  });
+
+  const allCoords = [];
+
+  Object.keys(grouped).forEach(indId => {
+    const indData = grouped[indId];
+    const indReales = indData.filter(r => !r.virtual || r.virtual === 'no');
+    
+    const coords = indReales.map(r => [r.lat, r.lng]);
+    coords.forEach(c => allCoords.push(c));
+
+    if (coords.length > 1) {
+      const pl = L.polyline(coords, {
+        color: '#30363d', weight: 1.5, opacity: 0.5, dashArray: '3 4'
+      }).addTo(map);
+      pathLayers.push(pl);
+    }
+
+    // Dibujar marcadores para este individuo
+    indData.forEach(r => {
+      const isVirtual = r.virtual === 'apertura' || r.virtual === 'cierre';
+      const color = getColor(r);
+      const isFirst = !isVirtual && r === indReales[0];
+      const isLast  = !isVirtual && r === indReales[indReales.length - 1];
+      const popup = buildPopup(r, isVirtual);
+
+      let marker;
+      if (r.virtual === 'cierre') {
+        marker = L.marker([r.lat, r.lng], { icon: makeVirtualCierreIcon() });
+      } else if (r.virtual === 'apertura') {
+        marker = L.marker([r.lat, r.lng], { icon: makeVirtualAperturaIcon() });
+      } else if (isFirst) {
+        marker = L.circleMarker([r.lat, r.lng], {
+          radius: 8, fillColor: '#3fb950', color: '#fff', weight: 1.5, fillOpacity: 1,
+        });
+      } else if (isLast) {
+        marker = L.circleMarker([r.lat, r.lng], {
+          radius: 8, fillColor: '#ff7b72', color: '#fff', weight: 1.5, fillOpacity: 1,
+        });
+      } else if (r.flag_vehiculo) {
+        marker = L.marker([r.lat, r.lng], { icon: makeVehiculoIcon('#ff7b72') });
+      } else if (r.flag_gap) {
+        marker = L.marker([r.lat, r.lng], { icon: makeGapIcon('#e3b341') });
+      } else if (r.poswrong === 'yes') {
+        marker = L.marker([r.lat, r.lng], { icon: makePoswrongIcon('#d2a8ff') });
+      } else {
+        marker = L.circleMarker([r.lat, r.lng], {
+          radius: getRadius(r),
+          fillColor: color, color: color, weight: 0.5, fillOpacity: 0.6,
+        });
+      }
+      marker.bindPopup(popup, { maxWidth: 240 });
+      marker.addTo(map);
+      markers.push(marker);
+    });
+  });
+
+  if (allCoords.length > 0)
+    map.fitBounds(L.latLngBounds(allCoords).pad(0.1));
+
+  // Stats
+  const nGap   = reales.filter(r => r.flag_gap).length;
+  const nVel   = reales.filter(r => r.flag_vehiculo).length;
+  const distTotal = reales.reduce((acc, r) => acc + (r.delspace || 0), 0);
+  const distLabel = distTotal >= 1000
+    ? (distTotal / 1000).toFixed(2) + ' km'
+    : Math.round(distTotal) + ' m';
+    
+  document.getElementById('s-registros').textContent = reales.length.toLocaleString();
+  document.getElementById('s-distancia').textContent = distLabel || '—';
+  document.getElementById('s-gaps').textContent = nGap;
+  document.getElementById('s-vel').textContent  = nVel;
+  document.getElementById('stats-strip').style.display = 'grid';
+}
+
+// ─── Lista de jornadas ────────────────────────────────────────
+function renderJornadasList() {
+  const list = document.getElementById('jornadas-list');
+  // En modo jornada, sí obligamos a seleccionar individuo concreto
+  if (!currentIndividuo) {
+    list.innerHTML = '<div class="empty"><div class="empty-icon">👆</div><span>Selecciona un individuo específico</span></div>';
+    return;
+  }
+
+  const filtro = document.getElementById('filtro-errores').value;
+  const datos  = getDatosFiltrados();
+
+  const jornadasMap = {};
+  datos.forEach(r => {
+    if (!jornadasMap[r.jorbio]) {
+      jornadasMap[r.jorbio] = { n: 0, gap: 0, vel: 0, pos: 0, distancia: 0, n_posiciones: null };
+    }
+    const j = jornadasMap[r.jorbio];
+    j.n++;
+    if (r.flag_gap)            j.gap++;
+    if (r.flag_vehiculo)       j.vel++;
+    if (r.poswrong === 'yes')  j.pos++;
+    if (r.n_posiciones != null)      j.n_posiciones = r.n_posiciones;
+    if (r.distancia_total_m != null) j.distancia = r.distancia_total_m;
+  });
+
+  let jornadas = Object.entries(jornadasMap)
+    .map(([date, v]) => ({
+      date, ...v,
+      hasError: v.gap > 0 || v.vel > 0 || v.pos > 0,
+      displayN: v.n_posiciones ?? v.n,
+    }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  if (filtro === 'errores') jornadas = jornadas.filter(j => j.hasError);
+  if (filtro === 'ok')      jornadas = jornadas.filter(j => !j.hasError);
+
+  if (jornadas.length === 0) {
+    list.innerHTML = '<div class="empty"><span>Sin jornadas en el rango</span></div>';
+    return;
+  }
+
+  list.innerHTML = jornadas.map(j => {
+    const distKm = j.distancia >= 1000
+      ? (j.distancia / 1000).toFixed(2) + ' km'
+      : Math.round(j.distancia) + ' m';
+    return `
+    <div class="jornada-item ${j.date === currentJornada ? 'active' : ''}"
+         onclick="selectJornada('${j.date}')">
+      <div class="jornada-top">
+        <span class="jornada-date">${j.date}</span>
+        <span class="jornada-badges">
+          ${j.gap  > 0 ? `<span class="badge badge-gap">GAP ${j.gap}</span>` : ''}
+          ${j.vel  > 0 ? `<span class="badge badge-vel">VEH ${j.vel}</span>` : ''}
+          ${j.pos  > 0 ? `<span class="badge badge-pos">POS ${j.pos}</span>` : ''}
+          ${!j.hasError   ? `<span class="badge badge-ok">OK</span>`  : ''}
+        </span>
+      </div>
+      <div class="jornada-metrics">
+        <span>📍 <b>${j.displayN}</b> pos.</span>
+        <span>📏 <b>${j.distancia > 0 ? distKm : '—'}</b></span>
+      </div>
+    </div>
+  `}).join('');
+}
+
+window.selectJornada = function(date) {
+  currentJornada = date;
+  renderJornadasList();
+  renderMapJornada();
+};
+
+function clearMap() {
+  markers.forEach(m => map.removeLayer(m));
+  pathLayers.forEach(l => map.removeLayer(l));
+  markers = [];
+  pathLayers = [];
+  document.getElementById('stats-strip').style.display = 'none';
+}
+
+function makeVirtualCierreIcon() {
+  return L.divIcon({
+    html: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><polygon points="8,14 1,2 15,2" fill="none" stroke="#a5d6ff" stroke-width="1.8" stroke-dasharray="3,2"/></svg>`,
+    className: '', iconSize: [16, 16], iconAnchor: [8, 14], popupAnchor: [0, -14],
+  });
+}
+function makeVirtualAperturaIcon() {
+  return L.divIcon({
+    html: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><polygon points="8,14 1,2 15,2" fill="#a5d6ff" stroke="#a5d6ff" stroke-width="1"/></svg>`,
+    className: '', iconSize: [16, 16], iconAnchor: [8, 14], popupAnchor: [0, -14],
+  });
+}
+function makeVehiculoIcon(color) {
+  return L.divIcon({
+    html: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><polygon points="8,1 15,15 1,15" fill="${color}" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/></svg>`,
+    className: '', iconSize: [16, 16], iconAnchor: [8, 15], popupAnchor: [0, -16],
+  });
+}
+function makeGapIcon(color) {
+  return L.divIcon({
+    html: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14"><rect x="1" y="1" width="12" height="12" fill="${color}" stroke="#fff" stroke-width="1.5"/></svg>`,
+    className: '', iconSize: [14, 14], iconAnchor: [7, 7], popupAnchor: [0, -10],
+  });
+}
+function makePoswrongIcon(color) {
+  return L.divIcon({
+    html: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><line x1="2" y1="2" x2="14" y2="14" stroke="${color}" stroke-width="3" stroke-linecap="round"/><line x1="14" y1="2" x2="2" y2="14" stroke="${color}" stroke-width="3" stroke-linecap="round"/></svg>`,
+    className: '', iconSize: [16, 16], iconAnchor: [8, 8], popupAnchor: [0, -10],
+  });
+}
+
+function buildPopup(r, isVirtual) {
+  return `
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:1.7;min-width:180px">
+      <b style="font-size:12px">${r.id_individuo}</b>
+      ${isVirtual ? `<span style="color:#a5d6ff;font-size:10px;margin-left:6px">VIRTUAL · ${r.virtual}</span>` : ''}<br>
+      <span style="color:#8b949e">${r.time_stamp}</span><br>
+      <hr style="border-color:#21262d;margin:4px 0">
+      Jornada: <b>${r.jorbio}</b><br>
+      Periodo: <b>${r.periodo}</b><br>
+      Δt: <b>${r.deltime ?? '—'} h</b> &nbsp; Δd: <b>${r.delspace != null ? Math.round(r.delspace) + ' m' : '—'}</b><br>
+      Vel: <b>${r.velreal ?? '—'} km/h</b><br>
+      ${r.flag_gap      ? '<span style="color:#f0883e">⚠ GAP temporal</span><br>' : ''}
+      ${r.flag_vehiculo ? '<span style="color:#ff7b72">▲ Posible vehículo</span><br>' : ''}
+      ${r.poswrong === 'yes' ? '<span style="color:#d2a8ff">✕ Posición errónea</span><br>' : ''}
+    </div>
+  `;
+}
+
+function renderMapJornada() {
+  clearMap();
+  if (!currentIndividuo || !currentJornada) return;
+
+  const registros = allData
+    .filter(r => r.id_individuo === currentIndividuo && r.jorbio === currentJornada)
+    .sort((a, b) => a.time_stamp.localeCompare(b.time_stamp));
+
+  if (registros.length === 0) return;
+
+  const reales = registros.filter(r => !r.virtual || r.virtual === 'no');
+
+  const coords = reales.map(r => [r.lat, r.lng]);
+  if (coords.length > 1) {
+    const pl = L.polyline(coords, {
+      color: '#30363d', weight: 1.5, opacity: 0.8, dashArray: '3 4'
+    }).addTo(map);
+    pathLayers.push(pl);
+  }
+
+  registros.forEach(r => {
+    const isVirtual = r.virtual === 'apertura' || r.virtual === 'cierre';
+    const color = getColor(r);
+    const isFirst = !isVirtual && r === reales[0];
+    const isLast  = !isVirtual && r === reales[reales.length - 1];
+
+    const popup = buildPopup(r, isVirtual);
+
+    let marker;
+    if (r.virtual === 'cierre') {
+      marker = L.marker([r.lat, r.lng], { icon: makeVirtualCierreIcon() });
+    } else if (r.virtual === 'apertura') {
+      marker = L.marker([r.lat, r.lng], { icon: makeVirtualAperturaIcon() });
+    } else if (isFirst) {
+      marker = L.circleMarker([r.lat, r.lng], {
+        radius: 9, fillColor: '#3fb950', color: '#fff', weight: 2, fillOpacity: 1,
+      });
+    } else if (isLast) {
+      marker = L.circleMarker([r.lat, r.lng], {
+        radius: 9, fillColor: '#ff7b72', color: '#fff', weight: 2, fillOpacity: 1,
+      });
+    } else if (r.flag_vehiculo) {
+      marker = L.marker([r.lat, r.lng], { icon: makeVehiculoIcon('#ff7b72') });
+    } else if (r.flag_gap) {
+      marker = L.marker([r.lat, r.lng], { icon: makeGapIcon('#e3b341') });
+    } else if (r.poswrong === 'yes') {
+      marker = L.marker([r.lat, r.lng], { icon: makePoswrongIcon('#d2a8ff') });
+    } else {
+      marker = L.circleMarker([r.lat, r.lng], {
+        radius: getRadius(r),
+        fillColor: color, color: color, weight: 0.5, fillOpacity: 0.85,
+      });
+    }
+    marker.bindPopup(popup, { maxWidth: 240 });
+    marker.addTo(map);
+    markers.push(marker);
+  });
+
+  if (coords.length > 0)
+    map.fitBounds(L.latLngBounds(coords).pad(0.12));
+
+  const nGap   = reales.filter(r => r.flag_gap).length;
+  const nVel   = reales.filter(r => r.flag_vehiculo).length;
+  const distTotal = reales.reduce((acc, r) => acc + (r.delspace || 0), 0);
+  const distLabel = distTotal >= 1000
+    ? (distTotal / 1000).toFixed(2) + ' km'
+    : Math.round(distTotal) + ' m';
+  document.getElementById('s-registros').textContent = reales.length;
+  document.getElementById('s-distancia').textContent = distLabel || '—';
+  document.getElementById('s-gaps').textContent = nGap;
+  document.getElementById('s-vel').textContent  = nVel;
+  document.getElementById('stats-strip').style.display = 'grid';
+}
+
+setMode('todos');
+
+})();
+</script>
+</body>
+</html>
