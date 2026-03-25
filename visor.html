@@ -436,11 +436,11 @@ input[type="date"]:focus { outline: 1px solid var(--accent); }
 // ─── Estado ───────────────────────────────────────────────────
 let allData        = [];
 let currentZona    = null;
-let currentIndividuo = null; // null o cadena vacía significa "todos los de la zona"
+let currentIndividuo = null;
 let currentJornada   = null;
-let currentMode      = 'todos';   // 'todos' | 'jornada'
+let currentMode      = 'todos';
 let markers          = [];
-let pathLayers       = []; // Para manejar múltiples polilíneas
+let pathLayers       = [];
 let activeFechaDesde = null;
 let activeFechaHasta = null;
 
@@ -588,6 +588,10 @@ function initUI() {
   selZ.disabled = false;
 
   populateIndividuos(null);
+  
+  // Autocompletar fechas iniciales con todo el dataset
+  autoFillDates(allData);
+  
   document.getElementById('load-btn').textContent = '✓ ' + allData.length.toLocaleString() + ' reg.';
 }
 
@@ -607,6 +611,29 @@ function populateIndividuos(zona) {
     sel.appendChild(opt);
   });
   sel.disabled = !zona;
+}
+
+// ─── Función Autocompletar Fechas ──────────────────────────────
+function autoFillDates(data) {
+  // Filtramos registros reales para obtener fechas biológicas
+  const dates = data
+    .filter(r => r.jorbio && r.virtual === 'no')
+    .map(r => r.jorbio)
+    .sort();
+
+  if (dates.length > 0) {
+    const min = dates[0];
+    const max = dates[dates.length - 1];
+    document.getElementById('fecha-desde').value = min;
+    document.getElementById('fecha-hasta').value = max;
+    activeFechaDesde = min;
+    activeFechaHasta = max;
+  } else {
+    document.getElementById('fecha-desde').value = '';
+    document.getElementById('fecha-hasta').value = '';
+    activeFechaDesde = null;
+    activeFechaHasta = null;
+  }
 }
 
 // ─── Cambio de modo ───────────────────────────────────────────
@@ -633,12 +660,12 @@ document.getElementById('sel-zona').addEventListener('change', e => {
   currentZona = e.target.value || null;
   currentIndividuo = null;
   currentJornada   = null;
-  activeFechaDesde = null;
-  activeFechaHasta = null;
-  document.getElementById('fecha-desde').value = '';
-  document.getElementById('fecha-hasta').value = '';
   
   populateIndividuos(currentZona);
+  
+  // Autocompletar fechas basándose en la zona (o todo si zona es null)
+  const zoneData = allData.filter(r => !currentZona || getZona(r.id_individuo) === currentZona);
+  autoFillDates(zoneData);
   
   if (currentMode === 'todos') {
     renderTodos();
@@ -652,19 +679,14 @@ document.getElementById('sel-zona').addEventListener('change', e => {
 document.getElementById('sel-individuo').addEventListener('change', e => {
   currentIndividuo = e.target.value || null;
   currentJornada   = null;
-  activeFechaDesde = null;
-  activeFechaHasta = null;
-  document.getElementById('fecha-desde').value = '';
-  document.getElementById('fecha-hasta').value = '';
 
-  if (currentIndividuo) {
-    const datos = allData.filter(r => r.id_individuo === currentIndividuo && r.virtual === 'no');
-    const fechas = datos.map(r => r.jorbio).sort();
-    if (fechas.length) {
-      document.getElementById('fecha-desde').value = fechas[0];
-      document.getElementById('fecha-hasta').value = fechas[fechas.length - 1];
-    }
-  }
+  // Autocompletar fechas basándose en individuo o zona si es "todos"
+  const targetData = allData.filter(r => {
+    if (currentIndividuo) return r.id_individuo === currentIndividuo;
+    if (currentZona) return getZona(r.id_individuo) === currentZona;
+    return true;
+  });
+  autoFillDates(targetData);
 
   if (currentMode === 'todos') {
     renderTodos();
@@ -678,7 +700,7 @@ document.getElementById('filtro-errores').addEventListener('change', () => {
   renderJornadasList();
 });
 
-// ─── Aplicar rango de fechas ──────────────────────────────────
+// ─── Aplicar rango de fechas (Manual) ──────────────────────────
 window.applyFechas = function() {
   activeFechaDesde = document.getElementById('fecha-desde').value || null;
   activeFechaHasta = document.getElementById('fecha-hasta').value || null;
@@ -694,15 +716,12 @@ window.applyFechas = function() {
 
 // ─── Obtener datos filtrados ─────
 function getDatosFiltrados() {
-  // Si no hay zona ni individuo, nada que mostrar
   if (!currentZona && !currentIndividuo) return [];
   
   return allData.filter(r => {
-    // Si hay individuo seleccionado, filtrar por él
     if (currentIndividuo) {
       if (r.id_individuo !== currentIndividuo) return false;
     } 
-    // Si no hay individuo pero sí zona, filtrar por zona
     else if (currentZona) {
       if (getZona(r.id_individuo) !== currentZona) return false;
     }
@@ -745,15 +764,13 @@ function renderTodos() {
   const nIndiv = [...new Set(reales.map(r => r.id_individuo))].length;
   
   const titleStr = currentIndividuo || `${currentZona} (${nIndiv} ind.)`;
-  const rangeStr = activeFechaDesde || activeFechaHasta
-    ? `${activeFechaDesde || fechas[0]} → ${activeFechaHasta || fechas[fechas.length-1]} · ${reales.length.toLocaleString()} pos.`
-    : `${fechas[0]} → ${fechas[fechas.length-1]} · ${reales.length.toLocaleString()} pos.`;
+  const rangeStr = `${fechas[0]} → ${fechas[fechas.length-1]} · ${reales.length.toLocaleString()} pos.`;
   
   nameLabel.textContent  = titleStr;
   rangeLabel.textContent = rangeStr;
   infoBar.classList.add('visible');
 
-  // Agrupar por individuo para dibujar polilíneas separadas
+  // Agrupar por individuo
   const grouped = {};
   registros.forEach(r => {
     if (!grouped[r.id_individuo]) grouped[r.id_individuo] = [];
@@ -776,7 +793,6 @@ function renderTodos() {
       pathLayers.push(pl);
     }
 
-    // Dibujar marcadores para este individuo
     indData.forEach(r => {
       const isVirtual = r.virtual === 'apertura' || r.virtual === 'cierre';
       const color = getColor(r);
@@ -818,7 +834,6 @@ function renderTodos() {
   if (allCoords.length > 0)
     map.fitBounds(L.latLngBounds(allCoords).pad(0.1));
 
-  // Stats
   const nGap   = reales.filter(r => r.flag_gap).length;
   const nVel   = reales.filter(r => r.flag_vehiculo).length;
   const distTotal = reales.reduce((acc, r) => acc + (r.delspace || 0), 0);
@@ -836,7 +851,6 @@ function renderTodos() {
 // ─── Lista de jornadas ────────────────────────────────────────
 function renderJornadasList() {
   const list = document.getElementById('jornadas-list');
-  // En modo jornada, sí obligamos a seleccionar individuo concreto
   if (!currentIndividuo) {
     list.innerHTML = '<div class="empty"><div class="empty-icon">👆</div><span>Selecciona un individuo específico</span></div>';
     return;
